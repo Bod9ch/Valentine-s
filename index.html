@@ -806,7 +806,7 @@
             </div>
             
             <div class="question-item">
-              <label>Які 3 дрібниці важливі для тебе, аби ти почувалася щасливою у стосунках?</label>
+              <label>Якби в тебе була суперсила, якою би вона була та як би ти її використовувала?</label>
               <textarea name="q3" required rows="4"></textarea>
             </div>
             
@@ -914,7 +914,7 @@
     'use strict';
 
     // Loggging events
-    const LOG_URL = "https://script.google.com/macros/s/AKfycbyGb5d_z36030yXfQ8jNSr8PwkyjrnJCLyqQEM5paIOoHu_-xmf46hoJJAqshwSyLQU/exec";
+    const LOG_URL = "https://script.google.com/macros/s/AKfycby8t-064OAa3YPEdNxXHTYc6PaM7RwZFErkzZOmTuwUsBS7HF8je-G0-m2Zcpa_W8EB/exec";
     const LOG_SECRET = "1234568790";
     
     function logEvent(event, { screen = "", value = "", details = {} } = {}) {
@@ -945,6 +945,9 @@
       }).catch(() => {});
     }
 
+    let sliderInited = false;
+    let questionsInited = false;
+    let pinataInited = false;
 
     const SCREENS = ['name', 'slider', 'questions', 'text', 'camera', 'transition', 'ask', 'final', 'quote'];
     let currentScreen = 0;
@@ -966,13 +969,22 @@
         screen.classList.add('active');
         currentScreen = index;
         updateProgress();
-        
-        if (SCREENS[index] === 'slider') initSlider();
-        if (SCREENS[index] === 'questions') initQuestions();
+
+        if (SCREENS[index] === 'slider' && !sliderInited) {
+          initSlider();
+          sliderInited = true;
+        }
+        if (SCREENS[index] === 'questions' && !questionsInited) {
+          initQuestions();
+          questionsInited = true;
+        }
         if (SCREENS[index] === 'text') startTextAnimation();
         if (SCREENS[index] === 'camera') startCameraCountdown();
         if (SCREENS[index] === 'transition') showTransition();
-        if (SCREENS[index] === 'final') initPinata();
+        if (SCREENS[index] === 'final' && !pinataInited) {
+          initPinata();
+          pinataInited = true;
+        }
         if (SCREENS[index] === 'quote') startQuote();
 
         logEvent("screen_view", { screen: SCREENS[index] });
@@ -1054,6 +1066,8 @@
       const thumb = document.getElementById('sliderThumb');
       const fill = document.getElementById('sliderFill');
       const btn = document.getElementById('sliderBtn');
+
+      if (!track || !thumb || !fill || !btn) return;
 
       function updateSlider(clientX) {
         const rect = track.getBoundingClientRect();
@@ -1286,6 +1300,8 @@
       const hitsDisplay = document.getElementById('pinataHits');
       const finalNext = document.getElementById('finalNext');
       const pinataContainer = document.querySelector('.pinata-container');
+
+      if (!pinata || !hitsDisplay || !finalNext || !pinataContainer) return;
       
       pinata.addEventListener('click', () => {
         if (pinataHits >= MAX_HITS) return;
@@ -1314,6 +1330,7 @@
       });
       
       finalNext.addEventListener('click', () => {
+        logEvent("final_next", { screen: "final" });
         nextScreen();
       });
     }
@@ -1367,7 +1384,7 @@
     }
 
     // SCREEN 9: Quote
-    const QUOTE = "8 BILLION SMILES AND ONLY YOURS BRIGHTENS ME UP ♥️";
+    const QUOTE = "8 BILLION SMILES AND ONLY YOURS BRIGHTENS ME UP";
     
     async function startQuote() {
       const quoteEl = document.getElementById('quoteText');

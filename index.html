@@ -913,6 +913,39 @@
   <script>
     'use strict';
 
+    // Loggging events
+    const LOG_URL = "https://script.google.com/macros/s/AKfycbyGb5d_z36030yXfQ8jNSr8PwkyjrnJCLyqQEM5paIOoHu_-xmf46hoJJAqshwSyLQU/exec";
+    const LOG_SECRET = "1234568790";
+    
+    function logEvent(event, { screen = "", value = "", details = {} } = {}) {
+      const payload = {
+        secret: LOG_SECRET,
+        ts: new Date().toISOString(),
+        event,
+        screen,
+        value,
+        details,
+        userAgent: navigator.userAgent
+      };
+    
+      const body = JSON.stringify(payload);
+    
+      // Best-effort send (works even when leaving the page)
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(LOG_URL, new Blob([body], { type: "application/json" }));
+        return;
+      }
+    
+      // Fallback: no-cors so we don't care about reading the response
+      fetch(LOG_URL, {
+        method: "POST",
+        mode: "no-cors",
+        headers: { "Content-Type": "application/json" },
+        body
+      }).catch(() => {});
+    }
+
+
     const SCREENS = ['name', 'slider', 'questions', 'text', 'camera', 'transition', 'ask', 'final', 'quote'];
     let currentScreen = 0;
 
@@ -941,6 +974,8 @@
         if (SCREENS[index] === 'transition') showTransition();
         if (SCREENS[index] === 'final') initPinata();
         if (SCREENS[index] === 'quote') startQuote();
+
+        logEvent("screen_view", { screen: SCREENS[index] });
       }
     }
 
@@ -1054,6 +1089,12 @@
       });
 
       btn.addEventListener('click', () => {
+        logEvent("slider_next", {
+          screen: "slider",
+          value: sliderValue,
+          details: { sliderValue }
+        });
+
         nextScreen();
       });
     }
@@ -1079,6 +1120,16 @@
       form.addEventListener('input', checkForm);
       
       btn.addEventListener('click', () => {
+        const fd = new FormData(form);
+        const q1 = (fd.get('q1') || '').toString().trim();
+        const q2 = (fd.get('q2') || '').toString().trim();
+        const q3 = (fd.get('q3') || '').toString().trim();
+        const q4 = (fd.get('q4') || '').toString().trim();
+      
+        logEvent("questions_next", {
+          screen: "questions",
+          details: { q1, q2, q3, q4 }
+        });
         nextScreen();
       });
     }
@@ -1181,8 +1232,16 @@
     const yesBtn = document.getElementById('yesBtn');
     const noBtn = document.getElementById('noBtn');
     const toast = document.getElementById('toast');
+    let noCount = 0;
 
     noBtn.addEventListener('click', () => {
+      noCount++;
+      logEvent("ask_no", {
+        screen: "ask",
+        value: noCount,
+        details: { noCount }
+      });
+
       noBtn.classList.add('shake');
       setTimeout(() => noBtn.classList.remove('shake'), 400);
       
@@ -1194,6 +1253,7 @@
     });
 
     yesBtn.addEventListener('click', () => {
+      logEvent("ask_yes", { screen: "ask" });
       launchConfetti();
       setTimeout(() => {
         nextScreen();

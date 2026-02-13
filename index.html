@@ -796,23 +796,23 @@
           
           <form class="questions-form" id="questionsForm">
             <div class="question-item">
-              <label>Яка твоя улюблена пісня Montell Fish?</label>
-              <input type="text" name="q1" required />
+              <label for="q1">Яка твоя улюблена пісня Montell Fish?</label>
+              <input id="q1" type="text" name="q1" required />
             </div>
-            
+          
             <div class="question-item">
-              <label>В якій печері ти би хотіла побувати?</label>
-              <input type="text" name="q2" required />
+              <label for="q2">В якій печері ти би хотіла побувати?</label>
+              <input id="q2" type="text" name="q2" required />
             </div>
-            
+          
             <div class="question-item">
-              <label>Якби в тебе була суперсила, якою би вона була та як би ти її використовувала?</label>
-              <textarea name="q3" required rows="4"></textarea>
+              <label for="q3">Якби в тебе була суперсила, якою би вона була та як би ти її використовувала?</label>
+              <textarea id="q3" name="q3" required rows="4"></textarea>
             </div>
-            
+          
             <div class="question-item">
-              <label>Як можна бути такою гарною?</label>
-              <input type="text" name="q4" required />
+              <label for="q4">Як можна бути такою гарною?</label>
+              <input id="q4" type="text" name="q4" required />
             </div>
           </form>
 
@@ -948,32 +948,36 @@
     
       const body = JSON.stringify(payload);
     
-      // 1) Best: sendBeacon (survives tab close)
-      if (navigator.sendBeacon) {
-        const ok = navigator.sendBeacon(LOG_URL, new Blob([body], { type: "text/plain;charset=utf-8" }));
-        console.log("[LOG] sendBeacon used:", ok);
-        return;
+      // Prefer beacon
+      try {
+        if (navigator.sendBeacon) {
+          const ok = navigator.sendBeacon(
+            LOG_URL,
+            new Blob([body], { type: "text/plain;charset=utf-8" })
+          );
+          console.log("[LOG] sendBeacon result:", ok);
+          return;
+        }
+      } catch (err) {
+        console.warn("[LOG] sendBeacon threw", err);
       }
     
-      // 2) Fallback: no-cors fetch (no preflight)
+      // Fallback: "fire and forget" POST (opaque)
       fetch(LOG_URL, {
         method: "POST",
         mode: "no-cors",
+        keepalive: true,
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body
       })
-        .then(() => console.log("[LOG] no-cors fetch sent"))
+        .then(() => console.log("[LOG] no-cors fetch sent (opaque)"))
         .catch((err) => console.error("[LOG] no-cors fetch failed", err));
     }
     
-    // Manual test from DevTools console: testLog()
-    window.testLog = () => {
-      const screenName = (typeof SCREENS !== "undefined" && typeof currentScreen !== "undefined")
-        ? SCREENS[currentScreen]
-        : "unknown";
-    
-      logEvent("client_test", { screen: screenName, details: { note: "manual test" } });
-    };
+    // Optional: call this once on load to verify the POST path works
+    function logBoot() {
+      logEvent("boot", { screen: "init", details: { href: location.href } });
+    }
 
     let sliderInited = false;
     let questionsInited = false;
@@ -1482,6 +1486,7 @@
     // Initialize
     initDNA();
     updateProgress();
+    logBoot();
   </script>
 </body>
 </html>

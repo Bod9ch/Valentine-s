@@ -916,8 +916,24 @@
     // Loggging events
     const LOG_URL = "https://script.google.com/macros/s/AKfycby8t-064OAa3YPEdNxXHTYc6PaM7RwZFErkzZOmTuwUsBS7HF8je-G0-m2Zcpa_W8EB/exec";
     const LOG_SECRET = "1234568790";
+      
+    // Toggle this if you ever want to silence logs quickly
+    const LOG_DEBUG = true;
     
-    function logEvent(event, { screen = "", value = "", details = {} } = {}) {
+    function logDebug(...args) {
+      if (!LOG_DEBUG) return;
+      console.log("[LOG]", ...args);
+    }
+    function logWarn(...args) {
+      if (!LOG_DEBUG) return;
+      console.warn("[LOG]", ...args);
+    }
+    function logErr(...args) {
+      if (!LOG_DEBUG) return;
+      console.error("[LOG]", ...args);
+    }
+    
+    async function logEvent(event, { screen = "", value = "", details = {} } = {}) {
       const payload = {
         secret: LOG_SECRET,
         ts: new Date().toISOString(),
@@ -928,22 +944,67 @@
         userAgent: navigator.userAgent
       };
     
-      const body = JSON.stringify(payload);
+      logDebug("logEvent() called:", payload);
     
-      // Best-effort send (works even when leaving the page)
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon(LOG_URL, new Blob([body], { type: "application/json" }));
-        return;
+      // 1) First try: normal fetch so we can read status + response
+      try {
+        const res = await fetch(LOG_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          cache: "no-store"
+        });
+    
+        const text = await res.text().catch(() => "");
+        logDebug(`fetch() response: ${res.status} ${res.statusText}`, text);
+    
+        return { ok: res.ok, status: res.status, transport: "fetch", responseText: text };
+      } catch (err) {
+        logWarn("fetch() failed, will fallback:", String(err));
       }
     
-      // Fallback: no-cors so we don't care about reading the response
-      fetch(LOG_URL, {
-        method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "application/json" },
-        body
-      }).catch(() => {});
+      // 2) Fallback: sendBeacon (best-effort, no readable response)
+      try {
+        if (navigator.sendBeacon) {
+          const ok = navigator.sendBeacon(
+            LOG_URL,
+            new Blob([JSON.stringify(payload)], { type: "application/json" })
+          );
+          logDebug("sendBeacon() attempted:", { ok });
+          return { ok, transport: "beacon" };
+        } else {
+          logWarn("sendBeacon not supported, will fallback to no-cors fetch");
+        }
+      } catch (err) {
+        logWarn("sendBeacon() failed, will fallback:", String(err));
+      }
+    
+      // 3) Final fallback: no-cors fetch (you can't read response)
+      try {
+        await fetch(LOG_URL, {
+          method: "POST",
+          mode: "no-cors",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          cache: "no-store"
+        });
+    
+        logDebug("no-cors fetch() sent (response not readable)");
+        return { ok: true, transport: "no-cors" };
+      } catch (err) {
+        logErr("no-cors fetch() failed:", String(err), payload);
+        return { ok: false, transport: "none", error: String(err) };
+      }
     }
+    
+    // Manual test from DevTools console: testLog()
+    window.testLog = () => {
+      const screenName = (typeof SCREENS !== "undefined" && typeof currentScreen !== "undefined")
+        ? SCREENS[currentScreen]
+        : "unknown";
+    
+      logEvent("client_test", { screen: screenName, details: { note: "manual test" } });
+    };
 
     let sliderInited = false;
     let questionsInited = false;
